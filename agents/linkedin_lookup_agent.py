@@ -8,7 +8,19 @@ from langchain.agents import (
     AgentExecutor,
 )
 from langchain import hub
-from tools.tools import get_profile_url_tavily, scrape_linkedin_profile
+from tools.tools import get_profile_url_tavily, scrape_linkedin_profile, scrape_profile_mocked
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+
+class LinkedInProfile(BaseModel):
+    name: str = Field(description="The person's full name")
+    headline: str = Field(description="Their LinkedIn headline")
+    location: str = Field(description="Location of the person")
+    experience: list[str] = Field(description="A list of past jobs")
+    education: list[str] = Field(description="A list of educational institutions")
+    skills: list[str] = Field(description="A list of skills")
+
+summary_parser = PydanticOutputParser(pydantic_object=LinkedInProfile)
 
 def lookup(name: str) -> dict:
     """
@@ -32,6 +44,11 @@ def lookup(name: str) -> dict:
             func=scrape_linkedin_profile,
             description="Scrape details from a LinkedIn profile URL."
         ),
+        Tool(
+            name="Scrape Cached LinkedIn Profile",
+            func=scrape_profile_mocked,
+            description="Scrape details from a LinkedIn profile of 김우정(AI Storyteller)"
+        )
     ]
 
     react_prompt = hub.pull("hwchase17/react")
@@ -49,9 +66,11 @@ def lookup(name: str) -> dict:
         return_intermediate_steps=True  # ✅ Capture agent reasoning & tool calls
     )
 
-    # Let the agent handle the entire lookup process
-    formatted_input = f"Find and extract details from the LinkedIn profile of {name}."
-
+    formatted_input = (
+        f"Find and extract details from the LinkedIn profile of {name} and translate them into Korean. "
+        f"Use cached results if possible. "
+        f"Return the result in the following structured JSON format: {summary_parser.get_format_instructions()}"
+    )
     result = agent_executor.invoke(
         input={"input": formatted_input}
     )
@@ -71,8 +90,14 @@ def lookup(name: str) -> dict:
     else:
         print("No tools were used.")
 
-    return result["output"]
+    try:
+        structured_output = summary_parser.parse(result["output"])
+    except Exception as e:
+        print("⚠️ Warning: Invalid JSON output. Returning raw response.")
+        structured_output = {"raw_output": result["output"]}
+
+    return structured_output
 
 if __name__ == "__main__":
-    profile_info = lookup("AI 스토리텔러 김우정")
+    profile_info = lookup("구글 창업자")
     print(profile_info)

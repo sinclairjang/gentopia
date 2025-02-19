@@ -12,6 +12,11 @@ def get_profile_url_tavily(name: str):
 
     return res[0]["url"]
 
+def scrape_profile_mocked(linkedin_profile_url: str):
+    """If the found LinkedIn profile url is storywell(김우정), 
+    this provides cached result from gist"""
+    return scrape_linkedin_profile(linkedin_profile_url, mock=True)
+
 def scrape_linkedin_profile(linkedin_profile_url: str, mock: bool = False):
     """Scrape information from LinkedIn profiles,
     Manually scrape the information from the LinkedIn profiles"""
